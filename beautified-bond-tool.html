@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>債券篩選工具 (Bond Filtering Tool)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #4361ee;
+      --primary-light: #4895ef;
+      --primary-dark: #3f37c9;
+      --secondary: #4cc9f0;
+      --danger: #f72585;
+      --success: #4dd4ac;
+      --neutral-dark: #2b2d42;
+      --neutral: #8d99ae;
+      --neutral-light: #edf2f4;
+      --white: #ffffff;
+      --shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+      --border-radius: 8px;
+      --transition: all 0.3s ease;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'SF Pro Display', 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+      line-height: 1.6;
+      color: var(--neutral-dark);
+      background-color: #f8fafc;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 30px 20px;
+    }
+    
+    h1, h2, h3 {
+      font-weight: 600;
+      line-height: 1.3;
+    }
+    
+    h1 {
+      color: var(--primary-dark);
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 2.5rem;
+      letter-spacing: -0.5px;
+    }
+    
+    h2 {
+      color: var(--neutral-dark);
+      font-size: 1.8rem;
+      margin-bottom: 20px;
+    }
+    
+    h3 {
+      color: var(--primary);
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 1.2rem;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+    }
+    
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+    }
+    
+    .card {
+      background-color: var(--white);
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      transition: var(--transition);
+    }
+    
+    .card:hover {
+      box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+      transform: translateY(-2px);
+    }
+    
+    .card-header {
+      background-color: var(--primary);
+      color: var(--white);
+      padding: 20px;
+      border-top-left-radius: var(--border-radius);
+      border-top-right-radius: var(--border-radius);
+    }
+    
+    .card-header h2 {
+      color: var(--white);
+      margin: 0;
+    }
+    
+    .card-body {
+      padding: 30px;
+    }
+    
+    .file-upload {
+      text-align: center;
+      padding: 40px 30px;
+      border: 2px dashed var(--neutral);
+      border-radius: var(--border-radius);
+      background-color: var(--neutral-light);
+      transition: var(--transition);
+      cursor: pointer;
+    }
+    
+    .file-upload:hover {
+      border-color: var(--primary);
+      background-color: rgba(67, 97, 238, 0.05);
+    }
+    
+    .file-upload h2 {
+      margin-bottom: 15px;
+      font-size: 1.5rem;
+    }
+    
+    .file-upload p {
+      margin-bottom: 15px;
+      color: var(--neutral);
+    }
+    
+    .file-upload-icon {
+      font-size: 48px;
+      color: var(--primary);
+      margin-bottom: 15px;
+    }
+    
+    .file-upload-input {
+      display: none;
+    }
+    
+    .upload-btn {
+      background-color: var(--primary);
+      color: var(--white);
+      padding: 12px 25px;
+      border-radius: 30px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      margin-top: 15px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .upload-btn:hover {
+      background-color: var(--primary-dark);
+      transform: translateY(-2px);
+    }
+    
+    .file-selected {
+      margin-top: 15px;
+      font-weight: 500;
+      color: var(--primary);
+    }
+    
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    
+    .filter-group {
+      margin-bottom: 20px;
+    }
+    
+    .filter-label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: var(--neutral-dark);
+    }
+    
+    .filter-input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 1px solid var(--neutral);
+      border-radius: var(--border-radius);
+      font-size: 1rem;
+      transition: var(--transition);
+      background-color: var(--white);
+    }
+    
+    .filter-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+    }
+    
+    .filter-select {
+      padding: 12px 15px;
+      border: 1px solid var(--neutral);
+      border-radius: var(--border-radius);
+      font-size: 1rem;
+      background-color: var(--white);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    
+    .filter-select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+    }
+    
+    .filter-input-group {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 15px;
+      margin: 30px 0;
+    }
+    
+    .btn {
+      padding: 12px 25px;
+      border-radius: 30px;
+      border: none;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: var(--transition);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .btn-primary {
+      background-color: var(--primary);
+      color: var(--white);
+    }
+    
+    .btn-primary:hover {
+      background-color: var(--primary-dark);
+      transform: translateY(-2px);
+    }
+    
+    .btn-success {
+      background-color: var(--success);
+      color: var(--white);
+    }
+    
+    .btn-success:hover {
+      background-color: #41c09c;
+      transform: translateY(-2px);
+    }
+    
+    .btn-danger {
+      background-color: var(--danger);
+      color: var(--white);
+    }
+    
+    .btn-danger:hover {
+      background-color: #e50f6d;
+      transform: translateY(-2px);
+    }
+    
+    .summary {
+      margin: 20px 0;
+      padding: 15px 20px;
+      background-color: var(--neutral-light);
+      border-radius: var(--border-radius);
+      font-weight: 600;
+      color: var(--primary-dark);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .summary i {
+      color: var(--primary);
+      font-size: 1.2rem;
+    }
+    
+    .results-container {
+      overflow: auto;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow);
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border-radius: var(--border-radius);
+      overflow: hidden;
+      background-color: var(--white);
+    }
+    
+    th {
+      background-color: var(--primary-dark);
+      color: var(--white);
+      font-weight: 600;
+      text-align: left;
+      padding: 15px;
+      position: sticky;
+      top: 0;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    
+    th:hover {
+      background-color: #3730b3;
+    }
+    
+    th small {
+      font-weight: 400;
+      opacity: 0.8;
+      display: block;
+      margin-top: 3px;
+    }
+    
+    td {
+      padding: 15px;
+      border-bottom: 1px solid var(--neutral-light);
+      transition: var(--transition);
+    }
+    
+    tr:last-child td {
+      border-bottom: none;
+    }
+    
+    tr:hover td {
+      background-color: rgba(67, 97, 238, 0.05);
+    }
+    
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+    
+    .loader {
+      display: inline-block;
+      width: 50px;
+      height: 50px;
+      border: 3px solid rgba(67, 97, 238, 0.3);
+      border-radius: 50%;
+      border-top-color: var(--primary);
+      animation: spin 1s ease-in-out infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+      margin-top: 15px;
+      color: var(--primary);
+      font-weight: 500;
+    }
+    
+    .message {
+      padding: 15px 20px;
+      border-radius: var(--border-radius);
+      margin: 15px 0;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .error {
+      background-color: rgba(247, 37, 133, 0.1);
+      color: var(--danger);
+      border-left: 4px solid var(--danger);
+    }
+    
+    .success {
+      background-color: rgba(77, 212, 172, 0.1);
+      color: var(--success);
+      border-left: 4px solid var(--success);
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    
+    .badge-high {
+      background-color: rgba(77, 212, 172, 0.2);
+      color: var(--success);
+    }
+    
+    .badge-medium {
+      background-color: rgba(76, 201, 240, 0.2);
+      color: var(--secondary);
+    }
+    
+    .badge-low {
+      background-color: rgba(247, 37, 133, 0.2);
+      color: var(--danger);
+    }
+    
+    .sort-icon {
+      display: inline-block;
+      margin-left: 5px;
+      font-size: 0.8rem;
+    }
+
+    .bond-selector {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+    
+    /* Responsive styles */
+    @media (max-width: 768px) {
+      body {
+        padding: 20px 15px;
+      }
+      
+      h1 {
+        font-size: 2rem;
+      }
+      
+      .card-body {
+        padding: 20px;
+      }
+      
+      .filters {
+        grid-template-columns: 1fr;
+      }
+      
+      .actions {
+        flex-direction: column;
+      }
+      
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+      
+      th, td {
+        padding: 10px;
+      }
+    }
+    
+    /* 打印樣式 */
+    @media print {
+      .controls, button, .modal { 
+        display: none !important; 
+      }
+      
+      body, .container { 
+        background-color: white; 
+        padding: 0; 
+        margin: 0; 
+        box-shadow: none;
+        color: black;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>債券篩選工具</h1>
+  <h3>Bond Filtering Tool — 使用「熱門債券」工作表篩選 (距到期年位於 AA 列，下次配息日位於 AJ 列，幣別位於 M 列)</h3>
+  
+  <div class="container">
+    <!-- File Upload Card -->
+    <div class="card">
+      <div class="card-header">
+        <h2><i class="fas fa-file-upload"></i> 上傳文件</h2>
+      </div>
+      <div class="card-body">
+        <div class="file-upload" id="drop-area">
+          <div class="file-upload-icon">
+            <i class="fas fa-file-excel"></i>
+          </div>
+          <h2>上傳 Excel 檔案</h2>
+          <p>拖曳檔案到此處或點擊選擇檔案</p>
+          <p style="color: var(--danger); font-weight: 500;">
+            <i class="fas fa-info-circle"></i> 工具將自動使用「熱門債券」工作表：<br>
+            距到期年從 AA 列讀取，下次配息日從 AJ 列讀取，幣別從 M 列讀取。
+          </p>
+          <input type="file" id="file-input" accept=".xlsm,.xlsx" class="file-upload-input" />
+          <button class="upload-btn" id="select-file">
+            <i class="fas fa-file-upload"></i> 選擇檔案
+          </button>
+          <div id="file-selected" class="file-selected" style="display: none;"></div>
+        </div>
+        
+        <div class="loading" id="loading">
+          <div class="loader"></div>
+          <p class="loading-text">處理檔案中，請稍候...</p>
+        </div>
+        
+        <div id="file-info"></div>
+      </div>
+    </div>
+    
+    <!-- Filters Card -->
+    <div class="card" id="filters" style="display: none;">
+      <div class="card-header">
+        <h2><i class="fas fa-filter"></i> 篩選條件</h2>
+      </div>
+      <div class="card-body">
+        <div class="filters">
+          <!-- Issuer Filter -->
+          <div class="filter-group">
+            <label for="issuer-filter" class="filter-label">
+              <i class="fas fa-building"></i> 發行人 (Issuer)
+            </label>
+            <input type="text" id="issuer-filter" class="filter-input" placeholder="輸入發行人名稱">
+          </div>
+          
+          <!-- Currency Filter -->
+          <div class="filter-group">
+            <label for="currency-filter" class="filter-label">
+              <i class="fas fa-dollar-sign"></i> 幣別 (Currency)
+            </label>
+            <input type="text" id="currency-filter" class="filter-input" placeholder="輸入幣別 (例如: USD, HKD)">
+          </div>
+
+          <!-- S&P Rating Filter -->
+          <div class="filter-group">
+            <label for="sp-rating-filter" class="filter-label">
+              <i class="fas fa-star"></i> 標普評級 (S&P Rating)
+            </label>
+            <div class="filter-input-group">
+              <select id="sp-rating-op" class="filter-select" style="width: 40%;">
+                <option value="=">=</option>
+                <option value=">=">>=</option>
+                <option value="<="><=</option>
+                <option value=">">></option>
+                <option value="<"><</option>
+              </select>
+              <input type="text" id="sp-rating-filter" class="filter-input" placeholder="例如: AAA, AA+, BBB-" style="width: 60%;">
+            </div>
+          </div>
+          
+          <!-- Years to Maturity Filter -->
+          <div class="filter-group">
+            <label for="years-to-maturity-filter" class="filter-label">
+              <i class="fas fa-calendar-alt"></i> 距到期年 (Years to Maturity)
+            </label>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div class="filter-input-group">
+                <select id="years-to-maturity-op" class="filter-select" style="width: 40%;">
+                  <option value=">">></option>
+                  <option value=">=">>=</option>
+                  <option value="=">=</option>
+                  <option value="<="><=</option>
+                  <option value="<"><</option>
+                </select>
+                <input type="number" id="years-to-maturity-filter" class="filter-input" placeholder="輸入起始年數" style="width: 60%;">
+              </div>
+              <div class="filter-input-group">
+                <select id="years-to-maturity-op2" class="filter-select" style="width: 40%;">
+                  <option value="<"><</option>
+                  <option value="<="><=</option>
+                  <option value="=">=</option>
+                  <option value=">=">>=</option>
+                  <option value=">">></option>
+                </select>
+                <input type="number" id="years-to-maturity-filter2" class="filter-input" placeholder="輸入結束年數" style="width: 60%;">
+              </div>
+            </div>
+          </div>
+          
+          <!-- Buy Price Filter -->
+          <div class="filter-group">
+            <label for="buy-price-filter" class="filter-label">
+              <i class="fas fa-tags"></i> 參考買入價 (Reference Buy Price)
+            </label>
+            <div class="filter-input-group">
+              <select id="buy-price-op" class="filter-select" style="width: 40%;">
+                <option value="=">=</option>
+                <option value=">=">>=</option>
+                <option value="<="><=</option>
+                <option value=">">></option>
+                <option value="<"><</option>
+              </select>
+              <input type="number" id="buy-price-filter" class="filter-input" placeholder="輸入價格" step="0.01" style="width: 60%;">
+            </div>
+          </div>
+          
+          <!-- Coupon Filter -->
+          <div class="filter-group">
+            <label for="coupon-filter" class="filter-label">
+              <i class="fas fa-percentage"></i> 票息 (Coupon)
+            </label>
+            <div class="filter-input-group">
+              <select id="coupon-op" class="filter-select" style="width: 40%;">
+                <option value="=">=</option>
+                <option value=">=">>=</option>
+                <option value="<="><=</option>
+                <option value=">">></option>
+                <option value="<"><</option>
+              </select>
+              <input type="number" id="coupon-filter" class="filter-input" placeholder="輸入票息率" step="0.01" style="width: 60%;">
+            </div>
+          </div>
+          
+          <!-- Next Dividend Date Filter -->
+          <div class="filter-group">
+            <label for="next-dividend-date-filter" class="filter-label">
+              <i class="fas fa-calendar-day"></i> 下次配息日 (Next Interest Date)
+            </label>
+            <input type="date" id="next-dividend-date-filter" class="filter-input" placeholder="選擇日期">
+          </div>
+        </div>
+        
+        <div class="actions">
+          <button id="apply-filters" class="btn btn-primary">
+            <i class="fas fa-search"></i> 套用篩選
+          </button>
+          <button id="reset-filters" class="btn btn-danger">
+            <i class="fas fa-undo"></i> 重置
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Results Card -->
+    <div class="card" id="results-card" style="display: none;">
+      <div class="card-header">
+        <h2><i class="fas fa-table"></i> 篩選結果</h2>
+      </div>
+      <div class="card-body">
+        <div id="summary" class="summary">
+          <i class="fas fa-info-circle"></i>
+          <span id="summary-text">請先上傳檔案並設定篩選條件</span>
+        </div>
+        
+        <div class="results-container">
+          <table id="results-table">
+            <!-- Table content will be dynamically generated -->
+          </table>
+        </div>
+        
+        <div class="actions" id="export-actions">
+          <!-- Export buttons will be added here -->
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // 定義欄位索引 (0-based)
+    const COLUMNS = {
+      PRODUCT_CODE: 1, // B 欄位，之後將動態判斷
+      ISSUER: 10,      // K 欄位
+      CURRENCY: 12,    // M 欄位
+      BUY_PRICE: 14,   // O 欄位
+      YEARS_TO_MATURITY: 26, // AA 欄位
+      SP_RATING: 29,   // AD 欄位
+      COUPON: 33,      // AH 欄位
+      NEXT_DIVIDEND_DATE: 35 // AJ 欄位
+    };
+    
+    // 全域變數
+    let workbook = null;
+    let allData = [];
+    let filteredData = [];
+    
+    // 排序狀態全域變數
+    let currentSortColumn = null;
+    let currentSortOrder = 'asc';
+    
+    // DOM 元素
+    const fileInput = document.getElementById('file-input');
+    const selectFileBtn = document.getElementById('select-file');
+    const fileSelectedDiv = document.getElementById('file-selected');
+    const fileInfo = document.getElementById('file-info');
+    const filtersDiv = document.getElementById('filters');
+    const resultsCard = document.getElementById('results-card');
+    const loadingDiv = document.getElementById('loading');
+    const applyFiltersBtn = document.getElementById('apply-filters');
+    const resetFiltersBtn = document.getElementById('reset-filters');
+    const summaryDiv = document.getElementById('summary');
+    const summaryText = document.getElementById('summary-text');
+    
+    // 選擇檔案按鈕點擊事件
+    selectFileBtn.addEventListener('click', function() {
+      fileInput.click();
+    });
+    
+    // 檔案選擇後顯示檔案名稱
+    fileInput.addEventListener('change', function() {
+      if (this.files.length > 0) {
+        fileSelectedDiv.textContent = `已選擇: ${this.files[0].name}`;
+        fileSelectedDiv.style.display = 'block';
+      } else {
+        fileSelectedDiv.style.display = 'none';
+      }
+    });
+    
+    // 顯示 loading
+    function showLoading() {
+      loadingDiv.style.display = 'block';
+    }
+    function hideLoading() {
+      loadingDiv.style.display = 'none';
+    }
+    function showError(message) {
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'message error';
+      errorDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
+      fileInfo.innerHTML = '';
+      fileInfo.appendChild(errorDiv);
+    }
+    function showSuccess(message) {
+      const successDiv = document.createElement('div');
+      successDiv.className = 'message success';
+      successDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${message}`;
+      fileInfo.innerHTML = '';
+      fileInfo.appendChild(successDiv);
+    }
+    
+    // 比較數值（各種運算子）
+    function compareValues(value1, value2, operator) {
+      if (value1 === undefined || value2 === undefined) {
+        return false;
+      }
+      switch (operator) {
+        case '=': return value1 == value2;
+        case '>=': return value1 >= value2;
+        case '<=': return value1 <= value2;
+        case '>': return value1 > value2;
+        case '<': return value1 < value2;
+        default: return true;
+      }
+    }
+    
+    // 將 S&P 評級轉成數值
+    function convertSPRatingToNumeric(rating) {
+      if (!rating) return -1;
+      const ratingMap = {
+        'AAA': 100,
+        'AA+': 95, 'AA': 90, 'AA-': 85,
+        'A+': 80, 'A': 75, 'A-': 70,
+        'BBB+': 65, 'BBB': 60, 'BBB-': 55,
+        'BB+': 50, 'BB': 45, 'BB-': 40,
+        'B+': 35, 'B': 30, 'B-': 25,
+        'CCC+': 20, 'CCC': 15, 'CCC-': 10,
+        'CC': 5, 'C': 3, 'D': 0
+      };
+      return ratingMap[String(rating).toUpperCase()] ?? -1;
+    }
+    
+    // 獲取評級對應的 CSS 類名
+    function getRatingBadgeClass(rating) {
+      if (!rating) return '';
+      const ratingValue = String(rating).toUpperCase();
+      if (ratingValue.includes('AAA') || ratingValue.includes('AA') || ratingValue.includes('A')) {
+        return 'badge badge-high';
+      } else if (ratingValue.includes('BBB')) {
+        return 'badge badge-medium';
+      } else {
+        return 'badge badge-low';
+      }
+    }
+    
+    // 格式化日期
+    function formatDate(dateValue) {
+      if (!dateValue) return '';
+      
+      let dateObj;
+      
+      if (typeof dateValue === 'number' && dateValue < 10) {
+        return dateValue.toString();
+      }
+      
+      if (dateValue instanceof Date) {
+        dateObj = dateValue;
+      } else if (typeof dateValue === 'string') {
+        if (dateValue.match(/^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}$/) || 
+            dateValue.match(/^\d{1,2}[-\/]\d{1,2}[-\/]\d{4}$/)) {
+          dateObj = new Date(dateValue);
+        } else {
+          return dateValue; 
+        }
+      } else if (typeof dateValue === 'number') {
+        if (dateValue > 59) { 
+          dateObj = new Date(Math.round((dateValue - 25569) * 86400 * 1000));
+        } else {
+          dateObj = new Date(Math.round((dateValue - 24107) * 86400 * 1000));
+        }
+        if (dateObj.getFullYear() < 1920 || dateObj.getFullYear() > 2100) {
+          return dateValue.toString();
+        }
+      }
+      
+      if (!dateObj || isNaN(dateObj.getTime())) {
+        return dateValue.toString(); 
+      }
+      
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      
+      return `${year}-${month}-${day}`;
+    }
+    
+    // 處理檔案上傳
+    fileInput.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      processFile(file);
+    });
+    
+    function processFile(file) {
+      showLoading();
+      fileInfo.innerHTML = '';
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          workbook = XLSX.read(data, { type: 'array', cellDates: true });
+          if (workbook.SheetNames.length === 0) {
+            throw new Error('工作簿中沒有找到工作表');
+          }
+          let targetSheetName = '';
+          for (const sheetName of workbook.SheetNames) {
+            if (sheetName === '熱門債券' || sheetName.includes('熱門') || sheetName.includes('债券')) {
+              targetSheetName = sheetName;
+              break;
+            }
+          }
+          if (!targetSheetName && workbook.SheetNames.length > 0) {
+            targetSheetName = workbook.SheetNames[0];
+          }
+          if (!targetSheetName) {
+            throw new Error('找不到合適的工作表');
+          }
+          console.log('使用工作表:', targetSheetName);
+          const worksheet = workbook.Sheets[targetSheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          if (jsonData.length <= 1) {
+            throw new Error('工作簿中沒有數據');
+          }
+          
+          let headerRowIndex = 0;
+          for (let i = 0; i < Math.min(30, jsonData.length); i++) {
+            if (jsonData[i] && jsonData[i].length > 30) {
+              const rowStr = (jsonData[i] || []).join(' ').toLowerCase();
+              if (rowStr.includes('發行人') || rowStr.includes('票息') || 
+                  rowStr.includes('標普') || rowStr.includes('產品') ||
+                  rowStr.includes('到期') || rowStr.includes('參考') || rowStr.includes('幣別')) {
+                headerRowIndex = i;
+                console.log('找到標題行:', i, rowStr);
+                break;
+              }
+            }
+          }
+          if (headerRowIndex === 0) {
+            let maxLength = 0;
+            for (let i = 0; i < Math.min(10, jsonData.length); i++) {
+              if (jsonData[i] && jsonData[i].length > maxLength) {
+                maxLength = jsonData[i].length;
+                headerRowIndex = i;
+              }
+            }
+            console.log('未找到標題行，使用最長列:', headerRowIndex);
+          }
+          console.log('找到的標題行:', jsonData[headerRowIndex]);
+          
+          const findColumnIndex = (keyword) => {
+            for (let i = 0; i < jsonData[headerRowIndex].length; i++) {
+              const header = String(jsonData[headerRowIndex][i] || '').toLowerCase();
+              if (header.includes(keyword)) {
+                return i;
+              }
+            }
+            return -1;
+          };
+          
+          console.log('表頭信息:', jsonData[headerRowIndex].map((h, i) => `${i}: ${h}`));
+          
+          COLUMNS.ISSUER = findColumnIndex('發行') || findColumnIndex('issuer') || 10; 
+          COLUMNS.BUY_PRICE = findColumnIndex('買入') || findColumnIndex('price') || 14;
+          COLUMNS.SP_RATING = findColumnIndex('標普') || findColumnIndex('rating') || 29; 
+          COLUMNS.COUPON = findColumnIndex('票息') || findColumnIndex('coupon') || 33; 
+          
+          COLUMNS.YEARS_TO_MATURITY = 26; // AA 列
+          COLUMNS.NEXT_DIVIDEND_DATE = 35; // AJ 列
+          COLUMNS.CURRENCY = 12; // M 列
+          
+          console.log('指定幣別欄位: M 列 (index 12)');
+          const currencyColIndex = findColumnIndex('幣別') || findColumnIndex('currency');
+          if (currencyColIndex !== -1 && currencyColIndex !== 12) {
+             console.log('發現幣別可能的欄位在:', currencyColIndex, '但將使用指定的 M 列 (index 12)');
+          }
+          
+          const productCodeIndex = findColumnIndex('代碼') || findColumnIndex('code') || findColumnIndex('產品');
+          if (productCodeIndex !== -1) {
+            COLUMNS.PRODUCT_CODE = productCodeIndex;
+            console.log('產品代碼欄位在:', productCodeIndex);
+          } else {
+            COLUMNS.PRODUCT_CODE = 1;
+          }
+          console.log('使用以下欄位索引：', COLUMNS);
+          
+          allData = jsonData.slice(headerRowIndex + 1).filter(row => {
+            if (!row || row.length === 0) return false;
+            const hasIssuer = (row[COLUMNS.ISSUER] !== undefined && row[COLUMNS.ISSUER] !== '') ||
+                              (row[10] !== undefined && row[10] !== ''); // Fallback to original K
+            const hasPrice = row[COLUMNS.BUY_PRICE] !== undefined && row[COLUMNS.BUY_PRICE] !== '';
+            const hasRating = row[COLUMNS.SP_RATING] !== undefined && row[COLUMNS.SP_RATING] !== '';
+            const hasCode = row[COLUMNS.PRODUCT_CODE] !== undefined && row[COLUMNS.PRODUCT_CODE] !== '';
+            return hasIssuer || hasPrice || hasRating || hasCode;
+          });
+          console.log(`篩選後資料筆數: ${allData.length}`);
+          console.log('前五筆資料:', allData.slice(0, 5).map(row => ({
+            code: row[COLUMNS.PRODUCT_CODE],
+            issuer: row[COLUMNS.ISSUER],
+            currency: row[COLUMNS.CURRENCY],
+            price: row[COLUMNS.BUY_PRICE],
+            rating: row[COLUMNS.SP_RATING],
+            coupon: row[COLUMNS.COUPON],
+            nextDividendDate: row[COLUMNS.NEXT_DIVIDEND_DATE]
+          })));
+          filteredData = [...allData];
+          showSuccess(`檔案載入成功！共有 ${allData.length} 筆債券資料`);
+          filtersDiv.style.display = 'block';
+          resultsCard.style.display = 'block';
+          displayResults(filteredData);
+        } catch (error) {
+          console.error('處理檔案錯誤:', error);
+          showError(`處理檔案時發生錯誤: ${error.message}`);
+        } finally {
+          hideLoading();
+        }
+      };
+      reader.onerror = function() {
+        hideLoading();
+        showError('讀取檔案時發生錯誤');
+      };
+      reader.readAsArrayBuffer(file);
+    }
+    
+    // 套用篩選條件
+    applyFiltersBtn.addEventListener('click', function() {
+      if (!allData || allData.length === 0) {
+        showError('請先上傳檔案');
+        return;
+      }
+      
+      const issuerFilter = document.getElementById('issuer-filter').value.trim().toLowerCase();
+      const currencyFilter = document.getElementById('currency-filter').value.trim().toLowerCase();
+      
+      const spRatingOp = document.getElementById('sp-rating-op').value;
+      const spRatingFilter = document.getElementById('sp-rating-filter').value.trim().toUpperCase();
+      const spRatingNumeric = convertSPRatingToNumeric(spRatingFilter);
+      
+      const yearsToMaturityOp = document.getElementById('years-to-maturity-op').value;
+      const yearsToMaturityFilter = document.getElementById('years-to-maturity-filter').value;
+      const yearsToMaturityNumeric = yearsToMaturityFilter ? parseFloat(yearsToMaturityFilter) : undefined;
+      
+      const yearsToMaturityOp2 = document.getElementById('years-to-maturity-op2').value;
+      const yearsToMaturityFilter2 = document.getElementById('years-to-maturity-filter2').value;
+      const yearsToMaturityNumeric2 = yearsToMaturityFilter2 ? parseFloat(yearsToMaturityFilter2) : undefined;
+      
+      const buyPriceOp = document.getElementById('buy-price-op').value;
+      const buyPriceFilter = document.getElementById('buy-price-filter').value;
+      const buyPriceNumeric = buyPriceFilter ? parseFloat(buyPriceFilter) : undefined;
+      
+      const couponOp = document.getElementById('coupon-op').value;
+      const couponFilter = document.getElementById('coupon-filter').value;
+      const couponNumeric = couponFilter ? parseFloat(couponFilter) : undefined;
+      
+      const nextDividendDateFilter = document.getElementById('next-dividend-date-filter').value;
+      
+      filteredData = allData.filter(row => {
+        // 發行人
+        const issuer = row[COLUMNS.ISSUER];
+        if (issuerFilter && (!issuer || String(issuer).toLowerCase().indexOf(issuerFilter) === -1)) {
+          return false;
+        }
+        // 幣別
+        const currency = row[COLUMNS.CURRENCY];
+        if (currencyFilter && (!currency || String(currency).toLowerCase().indexOf(currencyFilter) === -1)) {
+          return false;
+        }
+        // S&P 評級
+        if (spRatingFilter) {
+          const rating = row[COLUMNS.SP_RATING];
+          const ratingNumeric = convertSPRatingToNumeric(rating);
+          if (!compareValues(ratingNumeric, spRatingNumeric, spRatingOp)) {
+            return false;
+          }
+        }
+        // 距到期年
+        if (yearsToMaturityNumeric !== undefined || yearsToMaturityNumeric2 !== undefined) {
+          const years = parseFloat(row[COLUMNS.YEARS_TO_MATURITY]);
+          if (yearsToMaturityNumeric !== undefined) {
+            if (!compareValues(years, yearsToMaturityNumeric, yearsToMaturityOp)) {
+              return false;
+            }
+          }
+          if (yearsToMaturityNumeric2 !== undefined) {
+            if (!compareValues(years, yearsToMaturityNumeric2, yearsToMaturityOp2)) {
+              return false;
+            }
+          }
+        }
+        // 參考買入價
+        if (buyPriceNumeric !== undefined) {
+          const price = row[COLUMNS.BUY_PRICE];
+          if (!compareValues(parseFloat(price), buyPriceNumeric, buyPriceOp)) {
+            return false;
+          }
+        }
+        // 票息
+        if (couponNumeric !== undefined) {
+          const coupon = row[COLUMNS.COUPON];
+          if (!compareValues(parseFloat(coupon), couponNumeric, couponOp)) {
+            return false;
+          }
+        }
+        // 下一配息日
+        if (nextDividendDateFilter) {
+          const nextDividendDate = row[COLUMNS.NEXT_DIVIDEND_DATE];
+          if (!nextDividendDate) {
+            return false;
+          }
+          const formattedDate = formatDate(nextDividendDate);
+          if (formattedDate !== nextDividendDateFilter) {
+            return false;
+          }
+        }
+        return true;
+      });
+      
+      currentSortColumn = null;
+      currentSortOrder = 'asc';
+      displayResults(filteredData);
+    });
+    
+    // 重置篩選條件
+    resetFiltersBtn.addEventListener('click', function() {
+      document.getElementById('issuer-filter').value = '';
+      document.getElementById('currency-filter').value = '';
+      document.getElementById('sp-rating-op').value = '=';
+      document.getElementById('sp-rating-filter').value = '';
+      document.getElementById('years-to-maturity-op').value = '>';
+      document.getElementById('years-to-maturity-filter').value = '';
+      document.getElementById('years-to-maturity-op2').value = '<';
+      document.getElementById('years-to-maturity-filter2').value = '';
+      document.getElementById('buy-price-op').value = '=';
+      document.getElementById('buy-price-filter').value = '';
+      document.getElementById('coupon-op').value = '=';
+      document.getElementById('coupon-filter').value = '';
+      document.getElementById('next-dividend-date-filter').value = '';
+      
+      filteredData = [...allData];
+      currentSortColumn = null;
+      currentSortOrder = 'asc';
+      displayResults(filteredData);
+    });
+    
+    // 顯示篩選結果與排序功能
+    function displayResults(data) {
+      const resultTable = document.getElementById('results-table');
+      resultTable.innerHTML = '';
+      
+      if (data.length === 0) {
+        summaryText.innerHTML = '<i class="fas fa-info-circle"></i> 符合條件的結果: 0 筆';
+        return;
+      } else {
+        summaryText.innerHTML = `<i class="fas fa-table"></i> 符合條件的結果: ${data.length} 筆`;
+      }
+      
+      const headers = [
+        { text: '選擇', enText: 'Select', colIndex: -1, sortType: 'none', icon: 'fas fa-check-square' },
+        { text: '產品代碼', enText: 'Product Code', colIndex: COLUMNS.PRODUCT_CODE, sortType: 'string', icon: 'fas fa-barcode' },
+        { text: '發行人', enText: 'Issuer', colIndex: COLUMNS.ISSUER, sortType: 'string', icon: 'fas fa-building' },
+        { text: '幣別', enText: 'Currency', colIndex: COLUMNS.CURRENCY, sortType: 'string', icon: 'fas fa-dollar-sign' },
+        { text: '參考買入價', enText: 'Buy Price', colIndex: COLUMNS.BUY_PRICE, sortType: 'number', icon: 'fas fa-tags' },
+        { text: '標普評級', enText: 'S&P Rating', colIndex: COLUMNS.SP_RATING, sortType: 'rating', icon: 'fas fa-star' },
+        { text: '票息', enText: 'Coupon', colIndex: COLUMNS.COUPON, sortType: 'number', icon: 'fas fa-percentage' },
+        { text: '距到期年', enText: 'Years to Maturity', colIndex: COLUMNS.YEARS_TO_MATURITY, sortType: 'number', icon: 'fas fa-calendar-alt' },
+        { text: '下次配息日', enText: 'Next Interest Date', colIndex: COLUMNS.NEXT_DIVIDEND_DATE, sortType: 'date', icon: 'fas fa-calendar-day' }
+      ];
+      
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      headers.forEach(header => {
+        const th = document.createElement('th');
+        if (header.colIndex === -1) {
+          th.innerHTML = `<i class="${header.icon}"></i> ${header.text}<small>${header.enText}</small>`;
+        } else {
+          let sortIcon = '';
+          if (currentSortColumn === header.colIndex) {
+            sortIcon = currentSortOrder === 'asc' ? '<i class="fas fa-sort-up sort-icon"></i>' : '<i class="fas fa-sort-down sort-icon"></i>';
+          } else {
+            sortIcon = '<i class="fas fa-sort sort-icon" style="opacity: 0.3;"></i>';
+          }
+          th.innerHTML = `<i class="${header.icon}"></i> ${header.text} ${sortIcon}<small>${header.enText}</small>`;
+          th.setAttribute('data-col-index', header.colIndex);
+          th.setAttribute('data-sort-type', header.sortType);
+          th.addEventListener('click', function() {
+            const clickedCol = parseInt(this.getAttribute('data-col-index'));
+            const sortType = this.getAttribute('data-sort-type');
+            if (currentSortColumn === clickedCol) {
+              currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+              currentSortColumn = clickedCol;
+              currentSortOrder = 'asc';
+            }
+            filteredData.sort((a, b) => {
+              let aVal = a[clickedCol];
+              let bVal = b[clickedCol];
+              if (sortType === 'number') {
+                aVal = parseFloat(aVal) || 0;
+                bVal = parseFloat(bVal) || 0;
+              } else if (sortType === 'rating') {
+                aVal = convertSPRatingToNumeric(aVal);
+                bVal = convertSPRatingToNumeric(bVal);
+              } else if (sortType === 'date') {
+                aVal = formatDate(aVal) || '';
+                bVal = formatDate(bVal) || '';
+              } else {
+                aVal = aVal ? String(aVal) : ""; // Ensure string conversion for all string sorts
+                bVal = bVal ? String(bVal) : "";
+              }
+              if (aVal < bVal) return currentSortOrder === 'asc' ? -1 : 1;
+              if (aVal > bVal) return currentSortOrder === 'asc' ? 1 : -1;
+              return 0;
+            });
+            displayResults(filteredData);
+          });
+        }
+        headerRow.appendChild(th);
+      });
+      thead.appendChild(headerRow);
+      resultTable.appendChild(thead);
+      
+      const tbody = document.createElement('tbody');
+      data.forEach((row, rowIndex) => {
+        const tr = document.createElement('tr');
+        
+        const tdSelect = document.createElement('td');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'bond-selector';
+        checkbox.dataset.rowIndex = rowIndex;
+        tdSelect.appendChild(checkbox);
+        tr.appendChild(tdSelect);
+        
+        const tdCode = document.createElement('td');
+        tdCode.textContent = row[COLUMNS.PRODUCT_CODE] || '';
+        tr.appendChild(tdCode);
+
+        const tdIssuer = document.createElement('td');
+        let issuerValue = row[COLUMNS.ISSUER]; // Try determined K
+        if (issuerValue === undefined || issuerValue === null || issuerValue === '') {
+          issuerValue = row[10]; // Fallback to original K if determined one is empty
+        }
+        tdIssuer.textContent = issuerValue || '';
+        tr.appendChild(tdIssuer);
+
+        const tdCurrency = document.createElement('td');
+        tdCurrency.textContent = row[COLUMNS.CURRENCY] || '';
+        tr.appendChild(tdCurrency);
+
+        const tdPrice = document.createElement('td');
+        const price = row[COLUMNS.BUY_PRICE];
+        if (price !== undefined && price !== null && price !== '') {
+          try {
+            tdPrice.textContent = typeof price === 'number' ? price.toFixed(2) : parseFloat(price).toFixed(2);
+          } catch (e) {
+            tdPrice.textContent = price;
+          }
+        } else {
+          tdPrice.textContent = '';
+        }
+        tr.appendChild(tdPrice);
+
+        const tdRating = document.createElement('td');
+        const rating = row[COLUMNS.SP_RATING];
+        if (rating) {
+          const span = document.createElement('span');
+          span.className = getRatingBadgeClass(rating);
+          span.textContent = rating;
+          tdRating.appendChild(span);
+        } else {
+          tdRating.textContent = '';
+        }
+        tr.appendChild(tdRating);
+
+        const tdCoupon = document.createElement('td');
+        const coupon = row[COLUMNS.COUPON];
+        if (coupon !== undefined && coupon !== null && coupon !== '') {
+          try {
+            tdCoupon.textContent = typeof coupon === 'number' ? coupon.toFixed(2) + '%' : parseFloat(coupon).toFixed(2) + '%';
+          } catch (e) {
+            tdCoupon.textContent = coupon;
+          }
+        } else {
+          tdCoupon.textContent = '';
+        }
+        tr.appendChild(tdCoupon);
+
+        const tdYears = document.createElement('td');
+        const years = row[COLUMNS.YEARS_TO_MATURITY];
+        if (years !== undefined && years !== null && years !== '') {
+          try {
+            tdYears.textContent = typeof years === 'number' ? years.toFixed(2) : parseFloat(years).toFixed(2);
+          } catch (e) {
+            tdYears.textContent = years;
+          }
+        } else {
+          tdYears.textContent = '';
+        }
+        tr.appendChild(tdYears);
+        
+        const tdNextDividend = document.createElement('td');
+        const nextDividendDate = row[COLUMNS.NEXT_DIVIDEND_DATE];
+        if (nextDividendDate) {
+          const formattedDate = formatDate(nextDividendDate);
+          if (formattedDate && !formattedDate.startsWith('1900-')) {
+            tdNextDividend.textContent = formattedDate;
+          } else if (typeof nextDividendDate === 'string' && nextDividendDate.includes('/')) {
+            tdNextDividend.textContent = nextDividendDate;
+          } else {
+            tdNextDividend.textContent = typeof nextDividendDate === 'number' ? nextDividendDate.toString() : '';
+          }
+        } else {
+          tdNextDividend.textContent = '';
+        }
+        tr.appendChild(tdNextDividend);
+        
+        tbody.appendChild(tr);
+      });
+      resultTable.appendChild(tbody);
+
+      addExportFunctionality();
+    }
+    
+    function addExportFunctionality() {
+      const actionsDiv = document.getElementById('export-actions');
+      actionsDiv.innerHTML = ''; 
+      
+      const exportBtn = document.createElement('button');
+      exportBtn.id = 'export-selected-btn';
+      exportBtn.className = 'btn btn-primary';
+      exportBtn.innerHTML = '<i class="fas fa-file-export"></i> 匯出選定債券';
+      exportBtn.addEventListener('click', exportSelectedBonds);
+      actionsDiv.appendChild(exportBtn);
+      
+      const openCalculatorBtn = document.createElement('button');
+      openCalculatorBtn.id = 'open-calculator-btn';
+      openCalculatorBtn.className = 'btn btn-success';
+      openCalculatorBtn.innerHTML = '<i class="fas fa-calculator"></i> 開啟計算器';
+      openCalculatorBtn.addEventListener('click', function() {
+        window.open('beautified-bond-calculator.html', '_blank');
+      });
+      actionsDiv.appendChild(openCalculatorBtn);
+      
+      const selectAllBtn = document.createElement('button');
+      selectAllBtn.id = 'select-all-btn';
+      selectAllBtn.className = 'btn btn-primary';
+      selectAllBtn.innerHTML = '<i class="fas fa-check-double"></i> 全選';
+      selectAllBtn.addEventListener('click', function() {
+        const checkboxes = document.querySelectorAll('.bond-selector');
+        checkboxes.forEach(checkbox => {
+          checkbox.checked = true;
+        });
+      });
+      actionsDiv.appendChild(selectAllBtn);
+      
+      const deselectAllBtn = document.createElement('button');
+      deselectAllBtn.id = 'deselect-all-btn';
+      deselectAllBtn.className = 'btn btn-danger';
+      deselectAllBtn.innerHTML = '<i class="fas fa-times"></i> 取消全選';
+      deselectAllBtn.addEventListener('click', function() {
+        const checkboxes = document.querySelectorAll('.bond-selector');
+        checkboxes.forEach(checkbox => {
+          checkbox.checked = false;
+        });
+      });
+      actionsDiv.appendChild(deselectAllBtn);
+    }
+    
+    function exportSelectedBonds() {
+      const checkboxes = document.querySelectorAll('.bond-selector:checked');
+      if (checkboxes.length === 0) {
+        alert('請至少選擇一個債券');
+        return;
+      }
+      
+      const selectedBonds = [];
+      checkboxes.forEach(checkbox => {
+        const rowIndex = parseInt(checkbox.dataset.rowIndex);
+        const row = filteredData[rowIndex];
+        
+        let nextDividendDate = row[COLUMNS.NEXT_DIVIDEND_DATE];
+        if (nextDividendDate) {
+          nextDividendDate = formatDate(nextDividendDate);
+        } else {
+          nextDividendDate = new Date().toISOString().split('T')[0].replace(/-/g, '/');
+        }
+        
+        selectedBonds.push({
+          code: row[COLUMNS.PRODUCT_CODE] || '',
+          name: row[COLUMNS.ISSUER] || row[10] || '', // Fallback to original K
+          currency: row[COLUMNS.CURRENCY] || '',
+          rating: row[COLUMNS.SP_RATING] || '',
+          maturity: "113%", 
+          remainingTerm: parseFloat(row[COLUMNS.YEARS_TO_MATURITY]) || 0,
+          referencePrice: parseFloat(row[COLUMNS.BUY_PRICE]) || 0,
+          investmentAmount: 100000, 
+          loanPercentage: "72%", 
+          interestRate: (row[COLUMNS.COUPON] || 0) + "%",
+          dividendFrequency: 2, 
+          nextDividendDate: nextDividendDate, 
+          loanCost: 0.0207 
+        });
+      });
+      
+      localStorage.setItem('selectedBonds', JSON.stringify(selectedBonds));
+      
+      alert(`已成功匯出 ${selectedBonds.length} 個債券。\n請點擊「開啟計算器」按鈕或直接開啟債券計算器頁面。`);
+    }
+    
+    const dropArea = document.getElementById('drop-area');
+    dropArea.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.style.backgroundColor = 'rgba(67, 97, 238, 0.1)';
+      this.style.borderColor = 'var(--primary)';
+    });
+    dropArea.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.style.backgroundColor = 'var(--neutral-light)';
+      this.style.borderColor = 'var(--neutral)';
+    });
+    dropArea.addEventListener('drop', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.style.backgroundColor = 'var(--neutral-light)';
+      this.style.borderColor = 'var(--neutral)';
+      if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        fileSelectedDiv.textContent = `已選擇: ${e.dataTransfer.files[0].name}`;
+        fileSelectedDiv.style.display = 'block';
+        processFile(e.dataTransfer.files[0]);
+      }
+    });
+  </script>
+</body>
+</html>
