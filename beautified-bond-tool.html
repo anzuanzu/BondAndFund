@@ -676,6 +676,22 @@
     // 排序狀態全域變數
     let currentSortColumn = null;
     let currentSortOrder = 'asc';
+
+    function applyDefaultFilters() {
+      document.getElementById('issuer-filter').value = '';
+      document.getElementById('currency-filter').value = 'USD';
+      document.getElementById('sp-rating-op').value = '>=';
+      document.getElementById('sp-rating-filter').value = 'A-';
+      document.getElementById('years-to-maturity-op').value = '>';
+      document.getElementById('years-to-maturity-filter').value = '5';
+      document.getElementById('years-to-maturity-op2').value = '<';
+      document.getElementById('years-to-maturity-filter2').value = '11';
+      document.getElementById('buy-price-op').value = '=';
+      document.getElementById('buy-price-filter').value = '';
+      document.getElementById('coupon-op').value = '>=';
+      document.getElementById('coupon-filter').value = '5.5';
+      document.getElementById('next-dividend-date-filter').value = '';
+    }
     
     // DOM 元素
     const fileInput = document.getElementById('file-input');
@@ -1050,25 +1066,15 @@
     
     // 重置篩選條件
     resetFiltersBtn.addEventListener('click', function() {
-      document.getElementById('issuer-filter').value = '';
-      document.getElementById('currency-filter').value = '';
-      document.getElementById('sp-rating-op').value = '=';
-      document.getElementById('sp-rating-filter').value = '';
-      document.getElementById('years-to-maturity-op').value = '>';
-      document.getElementById('years-to-maturity-filter').value = '';
-      document.getElementById('years-to-maturity-op2').value = '<';
-      document.getElementById('years-to-maturity-filter2').value = '';
-      document.getElementById('buy-price-op').value = '=';
-      document.getElementById('buy-price-filter').value = '';
-      document.getElementById('coupon-op').value = '=';
-      document.getElementById('coupon-filter').value = '';
-      document.getElementById('next-dividend-date-filter').value = '';
+      applyDefaultFilters();
       
       filteredData = [...allData];
       currentSortColumn = null;
       currentSortOrder = 'asc';
       displayResults(filteredData);
     });
+
+    applyDefaultFilters();
     
     // 顯示篩選結果與排序功能
     function displayResults(data) {

@@ -652,6 +652,33 @@
         color: var(--gray-color);
         margin-left: 10px;
     }
+
+    .bond-layer-note {
+      margin: 12px 0 0;
+      padding: 12px 16px;
+      background: #f5f8ff;
+      border-left: 4px solid var(--primary-color);
+      border-radius: 10px;
+      color: var(--dark-color);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+
+    .bond-layer-note strong {
+      color: var(--primary-color);
+    }
+
+    .bond-face-meta {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.78rem;
+      color: var(--gray-color);
+    }
+
+    .bond-face-warning {
+      color: var(--accent-color);
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -749,6 +776,9 @@
           <i class="fas fa-arrows-alt"></i> 可拖曳排序
         </div>
       </h2>
+      <div class="bond-layer-note">
+        <strong>質押投資面額規則：</strong>第 1 層面額手動設定；第 2 層起依前一層質借金額自動計算，並以 10,000 為單位無條件捨去，最低面額為 200,000。最多支援 5 檔債券。
+      </div>
       <div class="table-container">
         <table class="bond-table" id="bondTable">
           <thead>
@@ -884,6 +914,9 @@
         <label for="investmentAmount">投資面額:</label>
         <input type="number" id="investmentAmount">
       </div>
+      <div class="form-group" id="autoFaceValueHint" style="display:none;">
+        <small style="color: var(--gray-color);">第 2 層起面額由系統依前一層質借金額自動計算，儲存時會覆蓋手動輸入。</small>
+      </div>
       <div class="form-group">
         <label for="loanPercentage">質借成數:</label>
         <input type="text" id="loanPercentage" value="72%">
@@ -935,6 +968,9 @@
       <div class="form-group">
         <label for="editInvestmentAmount">投資面額:</label>
         <input type="number" id="editInvestmentAmount">
+      </div>
+      <div class="form-group">
+        <small id="editFaceValueHint" style="color: var(--gray-color);"></small>
       </div>
       <div class="form-group">
         <label for="editLoanPercentage">質借成數:</label>
@@ -1057,6 +1093,9 @@
 
     // 全域變數，用於追蹤 USD/TWD 是否被手動修改
     let usdRateManuallyChanged = false;
+    const MAX_BOND_LAYERS = 5;
+    const MIN_AUTO_FACE_VALUE = 200000;
+    const FACE_VALUE_ROUND_UNIT = 10000;
     
     // 格式化數字為千分位
     function formatNumber(number) {
@@ -1070,6 +1109,76 @@
     
     // 拖曳排序相關變數
     let draggedItem = null;
+
+    function parsePercentageValue(value) {
+      const parsedValue = parseFloat(String(value).replace("%", ""));
+      return isNaN(parsedValue) ? 0 : parsedValue / 100;
+    }
+
+    function roundAutoFaceValue(rawFaceValue) {
+      if (!isFinite(rawFaceValue) || rawFaceValue <= 0) {
+        return {
+          faceValue: MIN_AUTO_FACE_VALUE,
+          roundedFaceValue: 0,
+          minApplied: true
+        };
+      }
+
+      const roundedFaceValue = Math.floor(rawFaceValue / FACE_VALUE_ROUND_UNIT) * FACE_VALUE_ROUND_UNIT;
+      if (roundedFaceValue < MIN_AUTO_FACE_VALUE) {
+        return {
+          faceValue: MIN_AUTO_FACE_VALUE,
+          roundedFaceValue,
+          minApplied: true
+        };
+      }
+
+      return {
+        faceValue: roundedFaceValue,
+        roundedFaceValue,
+        minApplied: false
+      };
+    }
+
+    function recalculateBondLayerMetrics() {
+      bonds = bonds.slice(0, MAX_BOND_LAYERS);
+
+      bonds.forEach((bond, index) => {
+        const buyPrice = parseFloat(bond.referencePrice);
+        const loanRatio = parsePercentageValue(bond.loanPercentage);
+        const currentFaceValue = parseInt(bond.investmentAmount, 10);
+
+        bond.layerNumber = index + 1;
+        bond.autoFaceValue = index > 0;
+        bond.autoFaceValueMinApplied = false;
+        bond.autoFaceValueRaw = null;
+        bond.autoFaceValueRounded = null;
+
+        if (index === 0) {
+          bond.investmentAmount = !isNaN(currentFaceValue) && currentFaceValue > 0 ? currentFaceValue : MIN_AUTO_FACE_VALUE;
+        } else {
+          const previousLoanAmount = parseFloat(bonds[index - 1].loanAmount);
+          const rawFaceValue = buyPrice > 0 ? previousLoanAmount / (buyPrice / 100) : 0;
+          const autoFaceValueResult = roundAutoFaceValue(rawFaceValue);
+
+          bond.investmentAmount = autoFaceValueResult.faceValue;
+          bond.autoFaceValueRaw = rawFaceValue;
+          bond.autoFaceValueRounded = autoFaceValueResult.roundedFaceValue;
+          bond.autoFaceValueMinApplied = autoFaceValueResult.minApplied;
+        }
+
+        bond.investmentAmount2 = buyPrice > 0
+          ? Math.round(bond.investmentAmount * (buyPrice / 100))
+          : 0;
+        bond.loanAmount = Math.round(bond.investmentAmount2 * loanRatio);
+      });
+    }
+
+    function refreshBondSection() {
+      recalculateBondLayerMetrics();
+      renderBondTable();
+      calculateAllStats();
+    }
 
     // Helper to get exchange rate for a given currency code
     function getExchangeRateForCurrency(currencyCode) {
@@ -1107,6 +1216,9 @@
         const row = document.createElement("tr");
         row.setAttribute("draggable", "true");
         row.setAttribute("data-index", index); 
+        const faceValueNote = bond.autoFaceValue
+          ? `<span class="bond-face-meta">第 ${bond.layerNumber} 層，自動計算</span>${bond.autoFaceValueMinApplied ? '<span class="bond-face-meta bond-face-warning">計算面額不足 200,000，已改採最低面額 200,000</span>' : ''}`
+          : `<span class="bond-face-meta">第 1 層，面額手動設定</span>`;
         row.innerHTML = `
           <td><i class="fas fa-grip-vertical drag-handle"></i></td>
           <td>${bond.code}</td>
@@ -1116,7 +1228,7 @@
           <td>${bond.maturity}</td>
           <td>${formatNumberWithDecimals(bond.remainingTerm, 2)}</td>
           <td>${formatNumberWithDecimals(bond.referencePrice, 2)}</td>
-          <td>${formatNumber(bond.investmentAmount)}</td>
+          <td>${formatNumber(bond.investmentAmount)}${faceValueNote}</td>
           <td>${formatNumber(bond.investmentAmount2)}</td>
           <td>${bond.loanPercentage}</td>
           <td>${formatNumber(bond.loanAmount)}</td>
@@ -1146,9 +1258,8 @@
             const reorderedBonds = newOrderedIndices.map(originalIndex => bonds[originalIndex]);
             bonds = reorderedBonds;
             
-            // Re-render to update data-index attributes for next drag operation
-            renderBondTable(); 
-            calculateAllStats();
+            // 拖曳後以新層級順序重新遞推
+            refreshBondSection();
             draggedItem = null;
         });
         
@@ -1194,8 +1305,7 @@
           // Or, if 'data-index' refers to the original index before re-render, this is fine.
           // For simplicity, assuming data-index matches current bonds array index after re-render.
           bonds.splice(index, 1);
-          renderBondTable(); // Re-render will re-assign data-index
-          calculateAllStats();
+          refreshBondSection();
         });
       });
       
@@ -1352,6 +1462,10 @@
       document.getElementById("editReferencePrice").value = parseFloat(bond.referencePrice).toFixed(2);
       document.getElementById("editInvestmentAmount").value = bond.investmentAmount;
       document.getElementById("editLoanPercentage").value = bond.loanPercentage;
+      document.getElementById("editInvestmentAmount").readOnly = index > 0;
+      document.getElementById("editFaceValueHint").textContent = index === 0
+        ? "第 1 層面額可手動修改。"
+        : `第 ${index + 1} 層面額將依前一層質借金額自動計算，儲存時會以系統結果覆蓋。`;
       document.getElementById("editBondIndex").value = index;
       document.getElementById("editBondModal").style.display = "block";
     }
@@ -1378,12 +1492,23 @@
           bonds = [];
         }
       }
+
+      const availableSlots = MAX_BOND_LAYERS - bonds.length;
+      if (availableSlots <= 0) {
+        alert(`質押投資最多僅支援 ${MAX_BOND_LAYERS} 檔債券。`);
+        return;
+      }
+
+      const bondsToImport = importedBondsFromFilterTool.slice(0, availableSlots);
+      if (bondsToImport.length < importedBondsFromFilterTool.length) {
+        alert(`質押投資最多僅支援 ${MAX_BOND_LAYERS} 檔債券，已僅導入前 ${bondsToImport.length} 檔。`);
+      }
       
-      importedBondsFromFilterTool.forEach(importedBond => {
+      bondsToImport.forEach(importedBond => {
         const refPrice = parseFloat((parseFloat(importedBond.referencePrice) + 3).toFixed(2));
         const investmentAmountVal = parseInt(importedBond.investmentAmount); 
-        const investmentAmount2Val = Math.round(investmentAmountVal * refPrice / 100); 
-        const loanPercentageValue = parseFloat(String(importedBond.loanPercentage).replace("%", "")) / 100;
+        const investmentAmount2Val = Math.round(investmentAmountVal * refPrice / 100);
+        const loanPercentageValue = parsePercentageValue(importedBond.loanPercentage);
         const loanAmountVal = Math.round(investmentAmount2Val * loanPercentageValue);
         
         const newBond = {
@@ -1407,8 +1532,7 @@
         bonds.push(newBond);
       });
       
-      renderBondTable();
-      calculateAllStats();
+      refreshBondSection();
       
       try {
         localStorage.removeItem('selectedBonds');
@@ -1417,7 +1541,7 @@
       }
       
       document.getElementById('import-notification').style.display = 'none';
-      alert(`成功導入 ${importedBondsFromFilterTool.length} 個債券！`);
+      alert(`成功導入 ${bondsToImport.length} 個債券！`);
     }
     
     document.addEventListener("DOMContentLoaded", async function() { 
@@ -1433,6 +1557,7 @@
 
       await fetchExchangeRates(true); 
 
+      recalculateBondLayerMetrics();
       renderBondTable();
       renderFundTable();
       calculateAllStats();
@@ -1465,6 +1590,11 @@
       });
       
       document.getElementById("saveBondBtn").addEventListener("click", function() {
+        if (bonds.length >= MAX_BOND_LAYERS) {
+          alert(`質押投資最多僅支援 ${MAX_BOND_LAYERS} 檔債券。`);
+          return;
+        }
+
         const inputRefPrice = parseFloat(document.getElementById("referencePrice").value);
         const refPrice = parseFloat((inputRefPrice + 3).toFixed(2)); 
         const investmentAmountVal = parseInt(document.getElementById("investmentAmount").value); 
@@ -1486,8 +1616,7 @@
           loanCost: parseFloat(document.getElementById("bondLoanCost").value) / 100
         };
         bonds.push(newBond);
-        renderBondTable();
-        calculateAllStats();
+        refreshBondSection();
         addBondModal.style.display = "none";
         addBondModal.querySelectorAll('input[type="text"], input[type="number"], select').forEach(input => {
             if(input.tagName === 'SELECT') input.value = input.options[0].value; // Reset select to first option
@@ -1497,6 +1626,8 @@
         document.getElementById("loanPercentage").value = "72%";
         document.getElementById("dividendFrequency").value = "2";
         document.getElementById("bondCurrency").value = "USD";
+        document.getElementById("autoFaceValueHint").style.display = "none";
+        document.getElementById("investmentAmount").readOnly = false;
       });
       
       document.getElementById("saveFundBtn").addEventListener("click", function() {
@@ -1538,20 +1669,15 @@
         if (!isNaN(newReferencePrice) && newReferencePrice > 0) {
           bond.referencePrice = parseFloat(newReferencePrice.toFixed(2));
         }
-        if (!isNaN(newInvestmentAmount) && newInvestmentAmount > 0) {
+        if (index === 0 && !isNaN(newInvestmentAmount) && newInvestmentAmount > 0) {
           bond.investmentAmount = newInvestmentAmount;
         }
         if (newLoanPercentageStr) {
             bond.loanPercentage = newLoanPercentageStr;
         }
-
-        bond.investmentAmount2 = Math.round(bond.investmentAmount * bond.referencePrice / 100); 
-        const loanPercentageValue = parseFloat(String(bond.loanPercentage).replace("%", "")) / 100;
-        bond.loanAmount = Math.round(bond.investmentAmount2 * loanPercentageValue); 
         
         editBondModal.style.display = "none";
-        renderBondTable();
-        calculateAllStats();
+        refreshBondSection();
       });
 
       document.getElementById("updateFundBtn").addEventListener("click", function() {
@@ -1580,7 +1706,7 @@
       });
       
       document.getElementById("calculateBtn").addEventListener("click", function() {
-        calculateAllStats();
+        refreshBondSection();
         alert("已重新計算所有統計數據！");
       });
 
@@ -1598,8 +1724,7 @@
         // The `usdRateManuallyChanged` flag now correctly controls if fetchExchangeRates updates the USD input
         await fetchExchangeRates(false); // Pass false, so it respects usdRateManuallyChanged
         
-        renderBondTable(); 
-        calculateAllStats(); 
+        refreshBondSection();
         alert("已更新參數/匯率並重新計算！");
       });
       
@@ -1675,13 +1800,9 @@
                         bond.nextDividendDate = dateVal.replace(/-/g, '/');
                     }
                 }
-                bond.investmentAmount2 = Math.round(bond.investmentAmount * bond.referencePrice / 100);
-                const loanPercentageValue = parseFloat(String(bond.loanPercentage).replace("%", "")) / 100;
-                bond.loanAmount = Math.round(bond.investmentAmount2 * loanPercentageValue);
               }
             }
-            renderBondTable();
-            calculateAllStats();
+            refreshBondSection();
             alert("資料導入完成！");
             importFile.value = "";
           };
@@ -1719,6 +1840,16 @@
         }
       } catch (storageError) {
         console.log('localStorage 不可用，跳過債券匯入檢查');
+      }
+    });
+
+    document.getElementById("addBondBtn").addEventListener("click", function() {
+      const nextLayer = bonds.length + 1;
+      const isAutoLayer = nextLayer > 1;
+      document.getElementById("investmentAmount").readOnly = isAutoLayer;
+      document.getElementById("autoFaceValueHint").style.display = isAutoLayer ? "block" : "none";
+      if (isAutoLayer) {
+        document.getElementById("investmentAmount").value = "";
       }
     });
   </script>
