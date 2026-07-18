@@ -282,9 +282,20 @@
       color: var(--gray-color);
       font-size: 0.9rem;
     }
+
+    .workspace-nav { width:min(1100px, calc(100vw - 40px)); margin:0 auto 22px; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid #d8e2ec; border-radius:12px; background:#fff; box-shadow:0 4px 14px rgba(44,62,80,.1); }
+    .workspace-nav__brand { color:var(--primary-color); font-size:.8rem; font-weight:800; letter-spacing:.06em; white-space:nowrap; }
+    .workspace-nav__links { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
+    .workspace-nav a { padding:7px 9px; border-radius:7px; color:#506274; font-size:.78rem; font-weight:700; text-decoration:none; }
+    .workspace-nav a:hover, .workspace-nav a.is-active { color:#fff; background:var(--secondary-color); }
+    @media (max-width:720px) { body { padding:14px 10px 20px; justify-content:flex-start; } .workspace-nav { width:100%; margin-bottom:16px; align-items:flex-start; flex-direction:column; } .workspace-nav__links { justify-content:flex-start; } }
   </style>
 </head>
 <body>
+  <nav class="workspace-nav" aria-label="投資工具導覽">
+    <span class="workspace-nav__brand">投資工具中心</span>
+    <span class="workspace-nav__links"><a href="https://anzuanzu.github.io/tools/">工具總覽</a><a class="is-active" aria-current="page" href="https://anzuanzu.github.io/BondAndFund/">債券／基金質借</a><a href="https://anzuanzu.github.io/fcneliAI/">FCN 標的雷達</a><a href="https://anzuanzu.github.io/insurance-financing-v2/">保單融資試算</a><a href="https://anzuanzu.github.io/Top50ETF/">ETF 技術掃描</a></span>
+  </nav>
   <div class="container">
     <h1>質借試算工具</h1>
     <h2>選擇您想要使用的試算工具</h2>
