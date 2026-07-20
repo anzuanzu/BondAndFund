@@ -1154,7 +1154,7 @@
       
       // 取得參數
       const fundLoanCostRate = parseFloat(document.getElementById("fundLoanCost").value) / 100;
-      const mortgageAmount = parseFloat(document.getElementById("mortgageAmount").value);
+      const mortgageAmount = Math.max(0, Number(document.getElementById("mortgageAmount").value) || 0);
       const mortgageLoanCostRate = parseFloat(document.getElementById("mortgageLoanCost").value) / 100;
       const exchangeRate = parseFloat(document.getElementById("exchangeRate").value);
       
@@ -1361,9 +1361,7 @@
       
       // 初始化基金數據，設定默認值
       const updateDefaultValues = function() {
-        const mortgageAmount = parseFloat(document.getElementById("mortgageAmount").value);
-        
-        // 如果有基金，只更新質借金額，不再自動設置投資金額
+        // 第一檔商品的質借金額是第二檔商品投資金額的自動預設來源。
         if (funds.length > 0) {
           // 只更新質借金額
           const loanPercentage = parseFloat(funds[0].loanPercentage.replace("%", "")) / 100;
@@ -1374,16 +1372,18 @@
             funds[0].interestRate = "9.0%";
           }
           
-          // 如果有第二檔基金，只更新質借金額
+          // 第二檔基金若尚未手動修改投資金額，持續以第一檔的質借金額作為預設值。
           if (funds.length > 1) {
             // 確保第二檔基金的利率為7%
             if (funds[1].interestRate !== "7.0%") {
               funds[1].interestRate = "7.0%";
             }
             
-            // 更新第二檔基金的質借金額
+            if (!funds[1].hasBeenEdited) funds[1].investmentAmount = funds[0].loanAmount;
             const secondLoanPercentage = parseFloat(funds[1].loanPercentage.replace("%", "")) / 100;
-            funds[1].loanAmount = Math.round(funds[1].investmentAmount * secondLoanPercentage);
+            funds[1].loanAmount = Number.isFinite(secondLoanPercentage)
+              ? Math.round(funds[1].investmentAmount * secondLoanPercentage)
+              : 0;
           }
         }
       };
@@ -1406,9 +1406,21 @@
       const fundCloseBtn = addFundModal.querySelector(".close");
       
       addFundBtn.addEventListener("click", function() { 
+        const investmentAmountInput = document.getElementById("fundInvestmentAmount");
+        if (funds.length === 1) {
+          investmentAmountInput.value = funds[0].loanAmount;
+          investmentAmountInput.dataset.autoDefault = "true";
+        } else {
+          investmentAmountInput.value = "";
+          delete investmentAmountInput.dataset.autoDefault;
+        }
         addFundModal.style.display = "block";
         // 在開啟對話框時初始化商品選項
         setTimeout(showProductOptions, 100);
+      });
+
+      document.getElementById("fundInvestmentAmount").addEventListener("input", function() {
+        delete this.dataset.autoDefault;
       });
       
       fundCloseBtn.addEventListener("click", function() { 
@@ -1608,11 +1620,12 @@
           interestRate = interestRate.endsWith("%") ? interestRate : interestRate + "%";
         }
         
+        const investmentAmountInput = document.getElementById("fundInvestmentAmount");
         // 投資金額直接使用用戶輸入，如果為0則使用預設值0
-        let investmentAmount = parseInt(document.getElementById("fundInvestmentAmount").value);
+        let investmentAmount = parseInt(investmentAmountInput.value);
         if (isNaN(investmentAmount)) {
           investmentAmount = 0;
-          document.getElementById("fundInvestmentAmount").value = investmentAmount;
+          investmentAmountInput.value = investmentAmount;
         }
         
         const loanPercentage = document.getElementById("loanPercentage").value;
@@ -1629,10 +1642,11 @@
           interestRate: interestRate,
           dividendFrequency: parseInt(document.getElementById("dividendFrequency").value),
           loanCost: parseFloat(document.getElementById("fundLoanCost").value) / 100,
-          hasBeenEdited: true // 所有新增的基金都標記為已編輯，確保投資金額不會被自動修改
+          hasBeenEdited: funds.length === 1 ? investmentAmountInput.dataset.autoDefault !== "true" : true
         };
         
         funds.push(newFund);
+        updateDefaultValues();
         renderFundTable();
         calculateAllStats();
         addFundModal.style.display = "none";
@@ -1672,6 +1686,7 @@
         if (newInterestRate !== "") fund.interestRate = newInterestRate.endsWith("%") ? newInterestRate : newInterestRate + "%";
         if (!isNaN(newDividendFrequency)) fund.dividendFrequency = newDividendFrequency;
         
+        updateDefaultValues();
         editFundModal.style.display = "none";
         renderFundTable();
         calculateAllStats();
