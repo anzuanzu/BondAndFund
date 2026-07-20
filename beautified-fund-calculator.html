@@ -95,6 +95,14 @@
       color: var(--primary-color);
       min-width: 120px;
     }
+
+    .exchange-rate-status {
+      flex-basis: 100%;
+      color: var(--gray-color);
+      font-size: 0.78rem;
+    }
+
+    .exchange-rate-status a { color: var(--secondary-color); }
     
     .product-section {
       margin-bottom: 35px;
@@ -427,6 +435,8 @@
         flex-direction: column;
         align-items: flex-start;
       }
+
+      .exchange-rate-status { margin-top: -6px; }
       
       .container {
         padding: 20px;
@@ -692,9 +702,11 @@
     
     <div class="header-info">
       <div class="header-parameter">
-        <strong><i class="fas fa-exchange-alt"></i> 匯率:</strong> 
-        <input type="number" id="exchangeRate" value="32" step="0.01" min="0" style="width:100px">
+        <strong><i class="fas fa-exchange-alt"></i> USD/TWD 匯率:</strong>
+        <input type="number" id="exchangeRate" value="32" step="0.0001" min="0" style="width:100px" aria-label="USD 兌台幣匯率">
+        <button id="refreshExchangeRateBtn" class="btn-secondary btn-sm" type="button"><i class="fas fa-sync-alt"></i> 更新匯率</button>
       </div>
+      <div id="exchangeRateStatus" class="exchange-rate-status">尚未更新；可手動輸入。</div>
       <div class="header-parameter">
         <strong><i class="fas fa-percentage"></i> 基金/債券借款成本:</strong> 
         <input type="number" id="fundLoanCost" value="2.95" step="0.01" min="0" max="100" style="width:100px">%
@@ -1153,14 +1165,15 @@
         exchangeRate
       });
       
-      // 按照新公式計算借款成本: 房屋貸款金額(台幣)*房貸借款成本+第一檔商品的質借金額*基金/債券借款成本
+      // 每年借款成本 = 質借金額總額 × 基金/債券借款成本 + 房屋貸款金額(台幣) × 房貸借款成本
       // 房貸成本
       const mortgageAnnualDebtCostTWD = mortgageAmount * mortgageLoanCostRate;
       console.log("Mortgage annual debt cost TWD:", mortgageAnnualDebtCostTWD);
       
-      // 基金借款成本 - 僅使用第一檔商品的質借金額 (使用前面已定義的 firstProductLoanAmount 變數)
-      const fundAnnualDebtCostTWD = firstProductLoanAmount * fundLoanCostRate;
-      console.log("First fund loan amount:", firstProductLoanAmount);
+      // 基金／債券借款成本以所有商品的質借金額加總計算
+      const totalFundLoanAmount = funds.reduce((sum, fund) => sum + (Number(fund.loanAmount) || 0), 0);
+      const fundAnnualDebtCostTWD = totalFundLoanAmount * fundLoanCostRate;
+      console.log("Total fund loan amount:", totalFundLoanAmount);
       console.log("Fund annual debt cost TWD:", fundAnnualDebtCostTWD);
       
       // 總借款成本(台幣)
@@ -1315,6 +1328,35 @@
     }
     
     document.addEventListener("DOMContentLoaded", function() {
+      const exchangeRateInput = document.getElementById("exchangeRate");
+      const exchangeRateStatus = document.getElementById("exchangeRateStatus");
+      const refreshExchangeRateBtn = document.getElementById("refreshExchangeRateBtn");
+      const exchangeRateEndpoint = "https://open.er-api.com/v6/latest/USD";
+
+      const refreshExchangeRate = async function() {
+        refreshExchangeRateBtn.disabled = true;
+        exchangeRateStatus.textContent = "正在取得最新 USD/TWD 參考匯率…";
+        try {
+          const response = await fetch(exchangeRateEndpoint, { cache: "no-store" });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const data = await response.json();
+          const rate = Number(data?.rates?.TWD);
+          if (!Number.isFinite(rate) || rate <= 0) throw new Error("匯率資料格式不正確");
+          exchangeRateInput.value = rate.toFixed(4);
+          const updatedAt = data.time_last_update_utc ? new Date(data.time_last_update_utc) : new Date();
+          const formattedTime = Number.isNaN(updatedAt.getTime()) ? "最新資料" : updatedAt.toLocaleString("zh-TW", { hour12: false });
+          exchangeRateStatus.innerHTML = `已更新：${formattedTime}（<a href="https://www.exchangerate-api.com/" target="_blank" rel="noopener noreferrer">ExchangeRate-API</a> 每日參考匯率）`;
+          calculateAllStats();
+        } catch (error) {
+          console.warn("無法更新 USD/TWD 匯率", error);
+          exchangeRateStatus.textContent = "暫時無法更新，已保留目前手動輸入的匯率。";
+        } finally {
+          refreshExchangeRateBtn.disabled = false;
+        }
+      };
+
+      refreshExchangeRateBtn.addEventListener("click", refreshExchangeRate);
+      refreshExchangeRate();
       document.getElementById("fundLoanCost").value = (initialFunds[0].loanCost * 100).toFixed(2);
       
       // 初始化基金數據，設定默認值
