@@ -1367,18 +1367,8 @@
           const loanPercentage = parseFloat(funds[0].loanPercentage.replace("%", "")) / 100;
           funds[0].loanAmount = Math.round(funds[0].investmentAmount * loanPercentage);
           
-          // 確保第一檔基金的利率為9%
-          if (funds[0].interestRate !== "9.0%") {
-            funds[0].interestRate = "9.0%";
-          }
-          
           // 第二檔基金若尚未手動修改投資金額，持續以第一檔的質借金額作為預設值。
           if (funds.length > 1) {
-            // 確保第二檔基金的利率為7%
-            if (funds[1].interestRate !== "7.0%") {
-              funds[1].interestRate = "7.0%";
-            }
-            
             if (!funds[1].hasBeenEdited) funds[1].investmentAmount = funds[0].loanAmount;
             const secondLoanPercentage = parseFloat(funds[1].loanPercentage.replace("%", "")) / 100;
             funds[1].loanAmount = Number.isFinite(secondLoanPercentage)
