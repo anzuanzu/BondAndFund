@@ -725,9 +725,43 @@
       color: var(--accent-color);
       font-weight: 600;
     }
+    .workspace-nav {
+      width: min(1350px, calc(100vw - 40px));
+      margin: 0 auto 22px;
+      padding: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border: 1px solid #d8e2ec;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(255,255,255,.98), rgba(245,249,253,.95));
+      box-shadow: 0 12px 28px rgba(44,62,80,.12);
+    }
+    .workspace-nav__brand { display: flex; align-items: center; gap: 8px; min-width: max-content; padding: 5px 8px; color: var(--primary-color); text-decoration: none; }
+    .workspace-nav__mark { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 10px; color: #fff; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); box-shadow: 0 5px 10px rgba(52,152,219,.24); font-size: .8rem; }
+    .workspace-nav__brand-copy { display: grid; line-height: 1.1; }
+    .workspace-nav__brand strong { font-size: .78rem; letter-spacing: .04em; }
+    .workspace-nav__brand small { margin-top: 3px; color: var(--gray-color); font-size: .6rem; font-weight: 700; letter-spacing: .05em; }
+    .workspace-nav__links { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; padding: 3px; border: 1px solid rgba(44,62,80,.07); border-radius: 11px; background: rgba(236,240,241,.72); }
+    .workspace-nav__links a { display: inline-flex; align-items: center; gap: 5px; padding: 7px 9px; border-radius: 8px; color: #506274; font-size: .75rem; font-weight: 750; text-decoration: none; transition: transform .16s ease, box-shadow .16s ease, background .16s ease; }
+    .workspace-nav__links a:hover { color: var(--primary-color); background: #fff; transform: translateY(-1px); }
+    .workspace-nav__links a.is-active { color: #fff; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); box-shadow: 0 5px 12px rgba(52,152,219,.22); }
+    .workspace-nav__icon { display: inline-grid; min-width: 13px; place-items: center; font-size: .65rem; font-weight: 850; }
+    @media (max-width: 720px) {
+      .workspace-nav { width: 100%; margin-bottom: 16px; align-items: stretch; flex-direction: column; }
+      .workspace-nav__links { justify-content: space-between; }
+      .workspace-nav__links a { flex: 1 1 auto; justify-content: center; padding: 7px 6px; font-size: .7rem; }
+      .workspace-nav__brand small { display: none; }
+    }
+    @media print { .workspace-nav { display: none !important; } }
   </style>
 </head>
 <body>
+  <nav class="workspace-nav" aria-label="投資工具導覽">
+    <a class="workspace-nav__brand" href="https://anzuanzu.github.io/tools/"><span class="workspace-nav__mark">✦</span><span class="workspace-nav__brand-copy"><strong>投資工具中心</strong><small>RESEARCH · SIMULATE</small></span></a>
+    <span class="workspace-nav__links"><a href="https://anzuanzu.github.io/tools/"><span class="workspace-nav__icon">⌂</span>工具總覽</a><a class="is-active" aria-current="page" href="https://anzuanzu.github.io/BondAndFund/"><span class="workspace-nav__icon">◎</span>債券／基金質借</a><a href="https://anzuanzu.github.io/fcneliAI/"><span class="workspace-nav__icon">FCN</span>標的雷達</a><a href="https://anzuanzu.github.io/insurance-financing-v2/"><span class="workspace-nav__icon">◈</span>保單融資試算</a><a href="https://anzuanzu.github.io/Top50ETF/"><span class="workspace-nav__icon">ETF</span>技術掃描</a></span>
+  </nav>
   <div class="container">
     <h1>債券與基金質借收益率評估表 <small style="font-size: 0.8rem; font-weight: normal;">僅供參考</small></h1>
     
