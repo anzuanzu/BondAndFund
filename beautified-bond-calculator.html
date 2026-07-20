@@ -269,6 +269,52 @@
       font-weight: 500;
       color: var(--primary-color);
     }
+
+    .fund-search-results {
+      display: none;
+      max-height: 210px;
+      overflow-y: auto;
+      margin-top: 8px;
+      border: 1px solid #d7e3ef;
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    .fund-search-option {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      padding: 10px 12px;
+      border: 0;
+      border-bottom: 1px solid #eef2f5;
+      border-radius: 0;
+      background: #fff;
+      color: var(--dark-color);
+      text-align: left;
+      line-height: 1.4;
+    }
+
+    .fund-search-option:hover,
+    .fund-search-option:focus {
+      background: #eef7ff;
+      color: var(--primary-color);
+    }
+
+    .fund-search-code {
+      display: inline-block;
+      min-width: 86px;
+      margin-right: 8px;
+      font-weight: 700;
+      color: var(--secondary-color);
+    }
+
+    .fund-search-empty,
+    .fund-investment-hint {
+      color: var(--gray-color);
+      font-size: 0.82rem;
+    }
+
+    .fund-search-empty { padding: 10px 12px; }
     
     .modal {
       display: none;
@@ -987,6 +1033,11 @@
       <span class="close">&times;</span>
       <h2><i class="fas fa-plus-circle"></i> 新增基金</h2>
       <div class="form-group">
+        <label for="fundSearch">搜尋基金資料庫:</label>
+        <input type="text" id="fundSearch" placeholder="輸入基金代碼、名稱或幣別（例如：富達、USD）" autocomplete="off">
+        <div id="fundSearchResults" class="fund-search-results" aria-live="polite"></div>
+      </div>
+      <div class="form-group">
         <label for="fundCode">商品代碼:</label>
         <input type="text" id="fundCode" required>
       </div>
@@ -995,8 +1046,9 @@
         <input type="text" id="fundName" required>
       </div>
       <div class="form-group">
-        <label for="fundInvestmentAmount">投資金額(請將最後一層質借金額換算為台幣):</label>
+        <label for="fundInvestmentAmount">投資金額(台幣):</label>
         <input type="number" id="fundInvestmentAmount" required>
+        <small id="fundInvestmentHint" class="fund-investment-hint"></small>
       </div>
       <div class="form-group">
         <label for="fundDividendRate">配息率(%):</label>
@@ -1032,6 +1084,7 @@
     </div>
   </div>
   
+  <script src="fund_data.js?v=20260720-2"></script>
   <script>
     // 初始債券數據
     const initialBonds = [
@@ -1090,6 +1143,7 @@
     
     // 初始化基金數據
     const initialFunds = [];
+    const fundCatalog = typeof externalFundProducts !== "undefined" ? externalFundProducts : [];
 
     // 全域變數，用於追蹤 USD/TWD 是否被手動修改
     let usdRateManuallyChanged = false;
@@ -1205,6 +1259,20 @@
                 break;
         }
         return isNaN(rate) || rate <= 0 ? 1.0 : rate; 
+    }
+
+    function getDefaultFundInvestmentAmount() {
+      const thirdBond = bonds[2];
+      const usdToTwdRate = getExchangeRateForCurrency("USD");
+
+      if (!thirdBond || !Number.isFinite(Number(thirdBond.loanAmount))) {
+        return { amount: 0, note: "尚無第 3 檔債券，請手動輸入投資金額。" };
+      }
+
+      return {
+        amount: Math.round(Number(thirdBond.loanAmount) * usdToTwdRate),
+        note: `已帶入第 3 檔債券質借金額 ${formatNumber(thirdBond.loanAmount)} × USD/TWD ${usdToTwdRate.toFixed(4)}。`
+      };
     }
     
     // 渲染債券表格
@@ -1571,7 +1639,76 @@
       const addFundBtn = document.getElementById("addFundBtn");
       const addFundModal = document.getElementById("addFundModal");
       const fundCloseBtn = addFundModal.querySelector(".close");
-      addFundBtn.addEventListener("click", function() { addFundModal.style.display = "block"; });
+      const fundSearchInput = document.getElementById("fundSearch");
+      const fundSearchResults = document.getElementById("fundSearchResults");
+      const fundCodeInput = document.getElementById("fundCode");
+      const fundNameInput = document.getElementById("fundName");
+      const fundInvestmentAmountInput = document.getElementById("fundInvestmentAmount");
+      const fundInvestmentHint = document.getElementById("fundInvestmentHint");
+
+      const clearFundSearchResults = function() {
+        fundSearchResults.innerHTML = "";
+        fundSearchResults.style.display = "none";
+      };
+
+      const selectFundFromCatalog = function(product) {
+        fundCodeInput.value = product.code;
+        fundNameInput.value = product.name;
+        fundSearchInput.value = `${product.code} ${product.name}`;
+        clearFundSearchResults();
+      };
+
+      const renderFundSearchResults = function(searchTerm) {
+        const normalizedTerm = searchTerm.trim().toLowerCase();
+        clearFundSearchResults();
+        if (!normalizedTerm) return;
+
+        const matches = fundCatalog.filter(product =>
+          product.code.toLowerCase().includes(normalizedTerm) ||
+          product.name.toLowerCase().includes(normalizedTerm) ||
+          (product.currency || "").toLowerCase().includes(normalizedTerm)
+        ).slice(0, 30);
+
+        if (matches.length === 0) {
+          const emptyState = document.createElement("div");
+          emptyState.className = "fund-search-empty";
+          emptyState.textContent = "找不到符合的基金。";
+          fundSearchResults.appendChild(emptyState);
+          fundSearchResults.style.display = "block";
+          return;
+        }
+
+        matches.forEach(product => {
+          const option = document.createElement("button");
+          option.type = "button";
+          option.className = "fund-search-option";
+          option.dataset.fundCode = product.code;
+
+          const code = document.createElement("span");
+          code.className = "fund-search-code";
+          code.textContent = product.code;
+          option.appendChild(code);
+          option.append(`${product.name}${product.currency ? ` · ${product.currency}` : ""}`);
+          option.addEventListener("click", () => selectFundFromCatalog(product));
+          fundSearchResults.appendChild(option);
+        });
+        fundSearchResults.style.display = "block";
+      };
+
+      fundSearchInput.addEventListener("input", function() {
+        renderFundSearchResults(this.value);
+      });
+
+      addFundBtn.addEventListener("click", function() {
+        fundSearchInput.value = "";
+        fundCodeInput.value = "";
+        fundNameInput.value = "";
+        clearFundSearchResults();
+        const defaultInvestment = getDefaultFundInvestmentAmount();
+        fundInvestmentAmountInput.value = defaultInvestment.amount;
+        fundInvestmentHint.textContent = defaultInvestment.note;
+        addFundModal.style.display = "block";
+      });
       fundCloseBtn.addEventListener("click", function() { addFundModal.style.display = "none"; });
       
       const editBondModal = document.getElementById("editBondModal");
@@ -1642,6 +1779,8 @@
         calculateAllStats();
         addFundModal.style.display = "none";
         addFundModal.querySelectorAll('input[type="text"], input[type="number"]').forEach(input => input.value = '');
+        clearFundSearchResults();
+        fundInvestmentHint.textContent = "";
       });
       
       document.getElementById("clearBtn").addEventListener("click", function() {
