@@ -1397,7 +1397,7 @@
         annualDebtCostTWD += bond.loanAmount * bondLoanCostRateDecimal * bondCurrencyRate;
       });
       
-      const mortgageAmountTWD = parseFloat(document.getElementById("mortgageAmount").value);
+      const mortgageAmountTWD = parseFloat(document.getElementById("mortgageAmount").value) || 0;
       const mortgageLoanCostRateDecimal = parseFloat(document.getElementById("mortgageLoanCost").value) / 100;
       annualDebtCostTWD += mortgageAmountTWD * mortgageLoanCostRateDecimal;
       
