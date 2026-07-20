@@ -818,7 +818,7 @@
       <h2><i class="fas fa-plus-circle"></i> 新增基金/債券</h2>
       <div class="form-group">
         <label for="searchProduct">搜尋基金/債券:</label>
-        <input type="text" id="searchProduct" placeholder="輸入代碼或名稱搜尋..." autocomplete="off">
+        <input type="text" id="searchProduct" placeholder="輸入基金名稱、代碼或幣別（例如：摩根、USD）" autocomplete="off">
       </div>
       <div class="form-group">
         <label for="productType">商品類型:</label>
@@ -1435,10 +1435,11 @@
           const productType = document.getElementById('productType').value;
           const products = productType === 'bond' ? bondProducts : fundProducts;
           
-          if (searchText.length >= 2) { // 至少輸入2個字才開始搜尋
+          if (searchText.length >= 1) {
             const matches = products.filter(product => 
-              product.code.toLowerCase().includes(searchText) || 
-              product.name.toLowerCase().includes(searchText)
+              product.code.toLowerCase().includes(searchText) ||
+              product.name.toLowerCase().includes(searchText) ||
+              product.currency?.toLowerCase().includes(searchText)
             );
             
             // 更新下拉選項
@@ -1881,6 +1882,7 @@
     function updateSearchResults(matches) {
       const codeOptions = document.getElementById('productCodeOptions');
       const nameOptions = document.getElementById('productNameOptions');
+      const visibleMatches = matches.slice(0, 40);
       
       if (!codeOptions || !nameOptions) {
         console.error('找不到下拉選單元素');
@@ -1889,7 +1891,7 @@
       
       // 清空並填充代碼選項列表
       codeOptions.innerHTML = '';
-      matches.forEach(product => {
+      visibleMatches.forEach(product => {
         const option = document.createElement('div');
         option.className = 'product-option';
         option.textContent = product.code;
@@ -1904,10 +1906,10 @@
       
       // 清空並填充名稱選項列表
       nameOptions.innerHTML = '';
-      matches.forEach(product => {
+      visibleMatches.forEach(product => {
         const option = document.createElement('div');
         option.className = 'product-option';
-        option.textContent = product.name;
+        option.textContent = product.currency ? `${product.name} · ${product.currency}` : product.name;
         option.addEventListener('click', function() {
           document.getElementById('fundName').value = product.name;
           document.getElementById('fundCode').value = product.code;
